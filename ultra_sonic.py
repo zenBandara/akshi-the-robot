@@ -1,6 +1,8 @@
 import serial
+import subprocess
 
 ser = serial.Serial('/dev/ttyUSB0', 115200, timeout=1)
+main_started = False
 
 try:
     while True:
@@ -29,6 +31,11 @@ try:
                     vals[key] = int(value)
                 except:
                     vals[key] = None
+
+        s1 = vals.get("S1")
+        if s1 is not None and 10 <= s1 <= 15 and not main_started:
+            subprocess.Popen(["python3", "main.py"])
+            main_started = True
 
         # Only print when all six sensors exist
         required = ["S1","S2","S3","S4","S5","S6"]
