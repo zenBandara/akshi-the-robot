@@ -1,0 +1,7 @@
+pyserial
+opencv-python
+mediapipe
+numpy
+pigpio
+picamera2
+RPi.GPIO
