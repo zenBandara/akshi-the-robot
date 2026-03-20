@@ -47,9 +47,9 @@ def main():
 
         # ---- Tests (4s each) ----
         drive(pi, l_fwd=1, label=f"Left wheel : FORWARD  (GPIO {L_FWD})")
-        # drive(pi, l_rev=1, label=f"Left wheel : REVERSE  (GPIO {L_REV})")
-        # drive(pi, r_fwd=1, label=f"Right wheel: FORWARD  (GPIO {R_FWD})")
-        # drive(pi, r_rev=1, label=f"Right wheel: REVERSE  (GPIO {R_REV})")
+        drive(pi, l_rev=1, label=f"Left wheel : REVERSE  (GPIO {L_REV})")
+        drive(pi, r_fwd=1, label=f"Right wheel: FORWARD  (GPIO {R_FWD})")
+        drive(pi, r_rev=1, label=f"Right wheel: REVERSE  (GPIO {R_REV})")
 
         print("Test complete.")
 

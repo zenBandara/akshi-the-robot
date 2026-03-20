@@ -26,8 +26,8 @@ GPIO.setwarnings(False)
 GPIO.setmode(GPIO.BCM)
 
 # --- Pins
-PIN_YAW   = 23   # left/right
-PIN_PITCH = 24   # up/down
+PIN_YAW   = 23   # up/down
+PIN_PITCH = 24   # left/right
 PIN_L_FWD = 22
 PIN_L_REV = 27
 PIN_R_FWD = 26
@@ -77,7 +77,7 @@ class Head:
         self._pwm_pitch = GPIO.PWM(pin_pitch, freq_hz)
         self._pwm_yaw.start(0)
         self._pwm_pitch.start(0)
-        print("Test complete.")
+        # print("Test complete.")
 
         # Track current angles (for smooth moves)
         self._yaw_angle   = 90.0
