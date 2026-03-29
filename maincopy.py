@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-
+import os
 import time
 import signal
 import math
@@ -9,6 +9,15 @@ import pigpio
 from picamera2 import Picamera2
 from wheel_handoff import WheelHandoffController
 
+NO_FACE_MP3 = "no_face.mp3"
+FACE_OK_MP3 = "ok_face.mp3"
+
+
+#audio play
+
+def play_sound(file):
+    os.system(f"pkill -f mpg123")
+    os.system(f"mpg123 -q {file} > /dev/null 2>&1 &")
 
 # ===================== SETTINGS =====================
 PIN_YAW = 24
@@ -127,6 +136,9 @@ YAW_UPDATE_INTERVAL = 0.15
 
 # 🔥 NEW: last sent value
 last_sent_yaw = None
+last_face_state = True
+no_face_start_time = None
+NO_FACE_DELAY = 2.0
 
 
 # ===================== LOOP =====================
@@ -143,6 +155,13 @@ while running:
     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
 
     if center:
+        # ===== FACE DETECTED EVENT =====
+        no_face_start_time = None
+
+        if last_face_state == False:
+            play_sound(FACE_OK_MP3)
+
+        last_face_state = True
         cx, cy = center
 
         ax_f = SMOOTH_ALPHA_LM*ax_f + (1-SMOOTH_ALPHA_LM)*cx
@@ -232,6 +251,15 @@ while running:
             face_present=False,
             dt=STEP_DT
         )
+
+        # ===== NO FACE EVENT =====
+        if no_face_start_time is None:
+            no_face_start_time = time.time()
+
+        if time.time() - no_face_start_time > NO_FACE_DELAY:
+            if last_face_state == True:
+                play_sound(NO_FACE_MP3)
+                last_face_state = False
 
     # cv2.imshow(WINDOW_NAME, frame)
 
