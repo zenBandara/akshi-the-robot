@@ -9,7 +9,7 @@ import pigpio
 
 # Servos (BCM pins)
 PIN_YAW = 24      # left right
-PIN_PITCH = 23    # up down
+PIN_PITCH = 25    # up down
 
 # Servo pulse range
 SERVO_MIN_US, SERVO_MAX_US = 600, 2400
