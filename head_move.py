@@ -16,7 +16,7 @@ from wheel_handoff import WheelHandoffController   # <-- INSERTED
 # ===================== USER SETTINGS =====================
 # Servos (BCM pins)
 PIN_YAW = 24   # left-right
-PIN_PITCH = 25   # up-down
+PIN_PITCH = 23   # up-down
 
 # Servo pulse + angle limits (tune to your rig)
 SERVO_MIN_US, SERVO_MAX_US = 600, 2400
@@ -243,10 +243,10 @@ try:
                 dt=STEP_DT
             )
 
-            if advice["mode"] == "chassis":
-                # hold head at center while base turns
-                yaw_deg = servo_yaw.set_angle(advice["yaw_hold_deg"])
-                moving = False  # request to skip PD this frame
+            # if advice["mode"] == "chassis":
+            #     # hold head at center while base turns
+            #     yaw_deg = servo_yaw.set_angle(advice["yaw_hold_deg"])
+            #     moving = False  # request to skip PD this frame
             # ------------------------------------------
 
             # Hysteresis: decide whether to move servos
@@ -264,7 +264,7 @@ try:
 
             # If moving, run PD; otherwise, hold last servo angles
             # <-- ensure head PD is skipped during chassis turn
-            if moving and advice["mode"] != "chassis":
+            if moving:
                 ex = dx / (FRAME_W/2.0)
                 ey = dy / (FRAME_H/2.0)
                 yaw_err = ex * (CAM_FOV_X_DEG / 2.0)
