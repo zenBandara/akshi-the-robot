@@ -8,7 +8,6 @@ import mediapipe as mp
 import pigpio
 from picamera2 import Picamera2
 from wheel_handoff import WheelHandoffController
-from web_socket import WebSocketServer
 
 NO_FACE_MP3 = "no_face.mp3"
 FACE_OK_MP3 = "ok_face.mp3"
@@ -28,7 +27,7 @@ SERVO_MIN_US, SERVO_MAX_US = 600, 2400
 SERVO_MIN_DEG, SERVO_MAX_DEG = 5.0, 170.0
 START_YAW_DEG, START_PITCH_DEG = 90.0, 90.0
 
-FRAME_W, FRAME_H = 640, 360
+FRAME_W, FRAME_H = 1000, 480
 
 CAM_FOV_X_DEG, CAM_FOV_Y_DEG = 62.0, 48.8
 
@@ -140,8 +139,6 @@ last_sent_yaw = None
 last_face_state = True
 no_face_start_time = None
 NO_FACE_DELAY = 2.0
-ws = WebSocketServer()
-ws.start()
 
 
 # ===================== LOOP =====================
@@ -156,7 +153,6 @@ while running:
 
     center = get_face_center(frame)
     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
-    ws.update_frame(frame)
 
     if center:
         # ===== FACE DETECTED EVENT =====
@@ -243,7 +239,7 @@ while running:
             if abs(dpp) >= MIN_STEP_PITCH_DEG:
                 pitch_deg = servo_pitch.set_angle(pitch_deg + dpp)
 
-        #cv2.circle(frame, (int(ax_f), int(ay_f)), 5, (0,255,0), -1)
+        cv2.circle(frame, (int(ax_f), int(ay_f)), 5, (0,255,0), -1)
 
     else:
         handoff.update(

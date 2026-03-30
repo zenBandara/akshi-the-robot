@@ -1,80 +1,77 @@
 import asyncio
 import websockets
-from picamera2 import Picamera2
 import cv2
 import struct
+import threading
 import firebase_request as fr
 
 # Set IP to Firebase
-
 fr.update_connected_ip()
 
-# Initialize camera
-picam2 = Picamera2()
 
-#High resolution - 1280, 720 Low - 640, 480
-config = picam2.create_video_configuration(
-    main={"size": (1280, 720), "format": "RGB888"}
-)
+class WebSocketServer:
 
-picam2.configure(config)
-picam2.start()
+    def __init__(self):
+        self.latest_frame = None
 
-async def stream(websocket):
-    print("Client connected")
+    # 🔥 Receive frame from main.py
+    def update_frame(self, frame):
+        self.latest_frame = frame
 
-    try:
-        while True:
-            # Capture frame
-            frame = picam2.capture_array()
+    async def stream(self, websocket):
+        print("Client connected")
 
-            # Convert RGB → BGR
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+        try:
+            while True:
+                if self.latest_frame is None:
+                    await asyncio.sleep(0.01)
+                    continue
 
-            # 🔴 Apply transformations
-            # frame = cv2.flip(frame, 0)   # upside down
-            # frame = cv2.flip(frame, 1)   # mirror left-right
-            # frame = cv2.flip(frame, 1)
-            frame = cv2.flip(frame, -1)
-            frame = cv2.flip(frame, 1)
+                # Use latest frame (NO camera here)
+                frame = self.latest_frame.copy()
 
-            # Improve clarity
-            frame = cv2.GaussianBlur(frame, (0, 0), 1)
-            frame = cv2.addWeighted(frame, 1.5, frame, -0.5, 0)
+                # 🔴 Apply transformations (UNCHANGED)
+                frame = cv2.flip(frame, 1)
 
-            # Encode
-            ret, buffer = cv2.imencode(
-                ".jpg",
-                frame,
-                [cv2.IMWRITE_JPEG_QUALITY, 60] #70
-            )
+                # Improve clarity (UNCHANGED)
+                frame = cv2.GaussianBlur(frame, (0, 0), 1)
+                frame = cv2.addWeighted(frame, 1.5, frame, -0.5, 0)
 
-            if not ret:
-                continue
+                # Encode (UNCHANGED)
+                ret, buffer = cv2.imencode(
+                    ".jpg",
+                    frame,
+                    [cv2.IMWRITE_JPEG_QUALITY, 60]
+                )
 
-            data = buffer.tobytes()
+                if not ret:
+                    continue
 
-            # Send size
-            await websocket.send(struct.pack(">I", len(data)))
+                data = buffer.tobytes()
 
-            # Send frame
-            await websocket.send(data)
+                # Send size (UNCHANGED)
+                await websocket.send(struct.pack(">I", len(data)))
 
-            await asyncio.sleep(0.05)
+                # Send frame (UNCHANGED)
+                await websocket.send(data)
 
-    except websockets.exceptions.ConnectionClosed:
-        print("Client disconnected")
+                await asyncio.sleep(0.05)
 
+        except websockets.exceptions.ConnectionClosed:
+            print("Client disconnected")
 
-async def main():
-    async with websockets.serve(
-        stream,
-        "0.0.0.0",
-        8765,
-        max_size=5_000_000
-    ):
-        print("Server started")
-        await asyncio.Future()
+    def start(self):
+        def run():
+            async def main():
+                async with websockets.serve(
+                    self.stream,
+                    "0.0.0.0",
+                    8765,
+                    max_size=5_000_000
+                ):
+                    print("Server started")
+                    await asyncio.Future()
 
+            asyncio.run(main())
 
-asyncio.run(main())
+        threading.Thread(target=run, daemon=True).start()
