@@ -1,70 +1,109 @@
 import asyncio
 import websockets
-from picamera2 import Picamera2
 import cv2
 import struct
+import threading
+import json
+import firebase_request as fr
 
-# Initialize camera
-picam2 = Picamera2()
-
-config = picam2.create_video_configuration(
-    main={"size": (1280, 720), "format": "RGB888"},
-    controls={"FrameRate": 30}
-)
-
-picam2.configure(config)
-picam2.start()
+# Set IP to Firebase
+fr.update_connected_ip()
 
 
-async def stream(websocket):
-    print("Client connected")
+class WebSocketServer:
 
-    try:
-        while True:
-            # Capture frame
-            frame = picam2.capture_array()
+    def __init__(self):
+        self.latest_frame = None
+        self.last_client_data = None  # ✅ store received data
 
-            # Convert RGB → BGR (required for OpenCV)
-            frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
+    # 🔥 Receive frame from main.py
+    def update_frame(self, frame):
+        self.latest_frame = frame
 
-            # ✅ SINGLE flip (combine operations)
-            frame = cv2.flip(frame, -1)   # same as flip 0 + 1
+    async def stream(self, websocket):
+        print("Client connected")
 
-            # ❌ REMOVE heavy processing (optional)
-            # If really needed, reduce strength
-            # frame = cv2.GaussianBlur(frame, (3, 3), 0)
+        async def sender():
+            try:
+                while True:
+                    if self.latest_frame is None:
+                        await asyncio.sleep(0.01)
+                        continue
 
-            # Encode (slightly lower quality for speed)
-            ret, buffer = cv2.imencode(
-                ".jpg",
-                frame,
-                [cv2.IMWRITE_JPEG_QUALITY, 60]
-            )
+                    # Use latest frame (NO camera here)
+                    frame = self.latest_frame.copy()
 
-            if not ret:
-                continue
+                    # 🔴 Apply transformations (UNCHANGED)
+                    frame = cv2.flip(frame, 1)
 
-            data = buffer.tobytes()
+                    # Improve clarity (UNCHANGED)
+                    frame = cv2.GaussianBlur(frame, (0, 0), 1)
+                    frame = cv2.addWeighted(frame, 1.5, frame, -0.5, 0)
 
-            # Send size + frame together (faster)
-            await websocket.send(struct.pack(">I", len(data)) + data)
+                    # Encode (UNCHANGED)
+                    ret, buffer = cv2.imencode(
+                        ".jpg",
+                        frame,
+                        [cv2.IMWRITE_JPEG_QUALITY, 60]
+                    )
 
-            # Small yield instead of fixed delay
-            await asyncio.sleep(0)
+                    if not ret:
+                        continue
 
-    except websockets.exceptions.ConnectionClosed:
+                    data = buffer.tobytes()
+
+                    # Send size (UNCHANGED)
+                    await websocket.send(struct.pack(">I", len(data)))
+
+                    # Send frame (UNCHANGED)
+                    await websocket.send(data)
+
+                    await asyncio.sleep(0.05)
+
+            except websockets.exceptions.ConnectionClosed:
+                print("Sender stopped")
+
+        async def listener():
+            try:
+                while True:
+                    msg = await websocket.recv()
+
+                    try:
+                        data = json.loads(msg)
+                        self.last_client_data = data  # ✅ store latest metrics
+                        print("Received metrics:", data)
+                    except:
+                        print("Received raw message:", msg)
+
+            except websockets.exceptions.ConnectionClosed:
+                print("Listener stopped")
+
+        # ✅ Run both sender and listener together safely
+        sender_task = asyncio.create_task(sender())
+        listener_task = asyncio.create_task(listener())
+
+        done, pending = await asyncio.wait(
+            [sender_task, listener_task],
+            return_when=asyncio.FIRST_EXCEPTION
+        )
+
+        for task in pending:
+            task.cancel()
+
         print("Client disconnected")
 
+    def start(self):
+        def run():
+            async def main():
+                async with websockets.serve(
+                    self.stream,
+                    "0.0.0.0",
+                    8765,
+                    max_size=5_000_000
+                ):
+                    print("Server started")
+                    await asyncio.Future()
 
-async def main():
-    async with websockets.serve(
-        stream,
-        "0.0.0.0",
-        8765,
-        max_size=5_000_000
-    ):
-        print("Server started")
-        await asyncio.Future()
+            asyncio.run(main())
 
-
-asyncio.run(main())
+        threading.Thread(target=run, daemon=True).start()

@@ -9,6 +9,10 @@ import pigpio
 from picamera2 import Picamera2
 from wheel_handoff import WheelHandoffController
 from web_socket import WebSocketServer
+from calibration_status import CalibrationWindow
+from PySide6.QtWidgets import QApplication
+import sys
+
 
 NO_FACE_MP3 = "no_face.mp3"
 FACE_OK_MP3 = "ok_face.mp3"
@@ -28,7 +32,8 @@ SERVO_MIN_US, SERVO_MAX_US = 600, 2400
 SERVO_MIN_DEG, SERVO_MAX_DEG = 5.0, 170.0
 START_YAW_DEG, START_PITCH_DEG = 90.0, 90.0
 
-FRAME_W, FRAME_H = 640, 360
+# FRAME_W, FRAME_H = 640, 360
+FRAME_W, FRAME_H = 1280, 720
 
 CAM_FOV_X_DEG, CAM_FOV_Y_DEG = 62.0, 48.8
 
@@ -97,21 +102,31 @@ def pixel_to_angle(cx, cy):
 mp_fd = mp.solutions.face_detection
 face_det = mp_fd.FaceDetection(0, 0.5)
 
+# def get_face_center(frame):
 
 def get_face_center(frame):
-    res = face_det.process(frame)
-    if not res.detections:
+
+    if frame is None:
         return None
 
-    det = res.detections[0]
-    rb = det.location_data.relative_bounding_box
+    if frame.size == 0:
+        return None
 
-    x = int(rb.xmin * FRAME_W)
-    y = int(rb.ymin * FRAME_H)
-    w = int(rb.width * FRAME_W)
-    h = int(rb.height * FRAME_H)
+    rgb = frame
 
-    return (x + w//2, y + h//2)
+    res = face_det.process(rgb)
+
+    if not res or not res.detections:
+        return None
+
+    # ✅ ADD THIS PART (MISSING)
+    detection = res.detections[0]
+    bbox = detection.location_data.relative_bounding_box
+
+    cx = int((bbox.xmin + bbox.width / 2) * FRAME_W)
+    cy = int((bbox.ymin + bbox.height / 2) * FRAME_H)
+
+    return cx, cy
 
 
 # ===================== INIT =====================
@@ -143,6 +158,11 @@ NO_FACE_DELAY = 2.0
 ws = WebSocketServer()
 ws.start()
 
+# calibration window
+app = QApplication(sys.argv)
+window = CalibrationWindow(ws)
+window.show()
+
 
 # ===================== LOOP =====================
 running = True
@@ -154,7 +174,16 @@ while running:
 
     frame = cv2.flip(picam2.capture_array(), -1)
 
-    center = get_face_center(frame)
+    if frame is None or frame.size == 0:
+        continue
+
+    # center = get_face_center(frame)
+    try:
+        center = get_face_center(frame)
+    except Exception as e:
+        print("Face detection error:", e)
+        center = None
+
     frame = cv2.cvtColor(frame, cv2.COLOR_RGB2BGR)
     ws.update_frame(frame)
 
@@ -271,6 +300,8 @@ while running:
         break
 
     time.sleep(STEP_DT)
+
+    app.processEvents()
 
 
 # ===================== CLEANUP =====================
